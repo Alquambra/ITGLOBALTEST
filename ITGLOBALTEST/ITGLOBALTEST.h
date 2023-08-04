@@ -66,7 +66,6 @@ public:
 	bmp_status_t write(string filename);
 	void invert();
 	void invertWithThreads();
-	void worker(vector<pixel_t>& row);
 private:
 	FILE* file;
 	const int FILE_HEADER_SIZE;
@@ -76,6 +75,7 @@ private:
 	vector<vector<pixel_t>> frame;
 	file_header_t file_header;
 	info_header_t info_header;
+	void worker(vector<pixel_t>& row);
 };
 
 
