@@ -58,6 +58,10 @@ typedef enum
 	WRITE_ERROR    = 3
 } bmp_status_t;
 
+
+
+
+
 class BMP
 {
 public:
@@ -66,16 +70,17 @@ public:
 	bmp_status_t write(string filename);
 	void invert();
 	void invertWithThreads();
-	void worker(vector<pixel_t>& row);
 private:
 	FILE* file;
 	const int FILE_HEADER_SIZE;
 	const int INFO_HEADER_SIZE;
 	const int FRAME_WIDTH;
 	const int FRAME_HEIGHT;
-	vector<vector<pixel_t>> frame;
+	vector<pixel_t> frame;
 	file_header_t file_header;
 	info_header_t info_header;
+	void worker(vector<pixel_t>& row, int start, int end);
+
 };
 
 

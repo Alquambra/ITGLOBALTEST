@@ -50,23 +50,17 @@ bmp_status_t BMP::read(string filename)
 		return WRONG_FORMAT;
 	}
 
-	frame.reserve(FRAME_HEIGHT);
+	frame.reserve(FRAME_HEIGHT * FRAME_WIDTH);
 
-	uint32_t counter = 0;
+	uint64_t counter = 0;
 
-	for (int i = 0; i < FRAME_HEIGHT; ++i)
+	for (int i = 0; i < FRAME_HEIGHT * FRAME_WIDTH; ++i)
 	{
-		vector<pixel_t> row;
-		row.reserve(FRAME_WIDTH);
-		for (int j = 0; j < FRAME_WIDTH; ++j)
-		{
-			pixel_t pixel;
-			pixel.r = buf[counter++];
-			pixel.g = buf[counter++];
-			pixel.b = buf[counter++];
-			row.push_back(pixel);
-		}
-		frame.push_back(row);
+		pixel_t pixel;
+		pixel.r = buf[counter++];
+		pixel.g = buf[counter++];
+		pixel.b = buf[counter++];
+		frame.push_back(pixel);
 	}
 
 	delete[] buf;
@@ -91,14 +85,11 @@ bmp_status_t BMP::write(string filename)
 	}
 	uint32_t counter = 0;
 	uint8_t* buf = new uint8_t[FRAME_HEIGHT * FRAME_WIDTH * 3];
-	for (int i = 0; i < FRAME_HEIGHT; ++i)
+	for (int i = 0; i < FRAME_HEIGHT * FRAME_WIDTH; ++i)
 	{
-		for (int j = 0; j < FRAME_WIDTH; ++j)
-		{
-			buf[counter++] = frame[i][j].r;
-			buf[counter++] = frame[i][j].g;
-			buf[counter++] = frame[i][j].b;
-		}
+		buf[counter++] = frame[i].r;
+		buf[counter++] = frame[i].g;
+		buf[counter++] = frame[i].b;
 	}
 	fwrite(buf, 1, FRAME_HEIGHT * FRAME_WIDTH * 3, file);
 	fclose(file);
@@ -109,14 +100,11 @@ bmp_status_t BMP::write(string filename)
 
 void BMP::invert()
 {
-	for (int i = 0; i < FRAME_HEIGHT; ++i)
+	for (int i = 0; i < FRAME_HEIGHT * FRAME_WIDTH; ++i)
 	{
-		for (int j = 0; j < FRAME_WIDTH; ++j)
-		{
-			frame[i][j].r = ~frame[i][j].r;
-			frame[i][j].g = ~frame[i][j].g;
-			frame[i][j].b = ~frame[i][j].b;
-		}
+		frame[i].r = ~frame[i].r;
+		frame[i].g = ~frame[i].g;
+		frame[i].b = ~frame[i].b;
 	}
 
 }
@@ -126,32 +114,29 @@ void BMP::invertWithThreads()
 	int cores = thread::hardware_concurrency();
 	vector<thread> threads(cores);
 
-	int row_number = 0;
-	for (;row_number < FRAME_HEIGHT - cores; row_number += cores)
+	int step = FRAME_HEIGHT * FRAME_WIDTH / cores;
+
+	for (int i = 0; i < cores - 1; ++i)
 	{
-		for (int i = 0; i < cores; ++i)
+		threads[i] = thread([&, i]()
 		{
-			threads[i] = thread([&, row_number]()
-				{
-					worker(frame[row_number + i]);
-				});
-			threads[i].join();
-		}
+			worker(ref(frame), step * i, step * (i + 1));
+		});
 	}
-	int i = row_number;
-	for (;row_number < FRAME_HEIGHT; ++row_number)
+
+	threads[cores - 1] = thread([&]()
 	{
-		threads[row_number - i] = thread([&, row_number]()
-			{
-				worker(frame[row_number]);
-			});
-		threads[row_number - i].join();
-	}
+		worker(ref(frame), step * (cores - 1), frame.size());
+	});
+
+	for (int i = 0; i < cores; ++i)
+		threads[i].join();
+
 }
 
-void BMP::worker(vector<pixel_t>& row)
+void BMP::worker(vector<pixel_t>& row, int start, int end)
 {
-	for (int i = 0; i < FRAME_WIDTH; ++i)
+	for (int i = start; i < end; ++i)
 	{
 		row[i].r = ~row[i].r;
 		row[i].g = ~row[i].g;
